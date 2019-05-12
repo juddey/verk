@@ -15,6 +15,10 @@ defmodule Verk.QueueConsumer do
     defstruct [:queue, :workers_manager, :redis, :node_id, :demand, :last_id]
   end
 
+  def reset(queue_consumer, n) do
+    GenServer.cast(queue_consumer, {:reset, n})
+  end
+
   def ask(queue_consumer, n) do
     GenServer.cast(queue_consumer, {:ask, n})
   end
@@ -49,7 +53,14 @@ defmodule Verk.QueueConsumer do
     _ -> :ok
   end
 
+  def handle_cast({:reset, new_demand}, state) do
+    Logger.info "#{new_demand} reset!"
+    if new_demand != 0, do: send(self(), :consume)
+    {:noreply, %{state | demand: new_demand}}
+  end
+
   def handle_cast({:ask, new_demand}, state) do
+    Logger.info "#{new_demand} ask!"
     if state.demand == 0, do: send(self(), :consume)
     {:noreply, %{state | demand: state.demand + new_demand}}
   end

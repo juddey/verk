@@ -23,14 +23,12 @@ defmodule Verk.SupervisorTest do
       {:ok, {_, children}} = init([])
       [redix, producer, stats, schedule_manager, manager_sup, drainer] = children
 
-      IO.inspect(redix)
-      assert {Verk.Redis, _, _, _, :worker, [Redix]} = redix
-      assert {Verk.EventProducer, _, _, _, :worker, [Verk.EventProducer]} = producer
-      assert {Verk.QueueStats, _, _, _, :worker, [Verk.QueueStats]} = stats
-      assert {Verk.ScheduleManager, _, _, _, :worker, [Verk.ScheduleManager]} = schedule_manager
+      assert redix == Verk.Redis.child_spec([])
+      assert %{id: Verk.EventProducer, type: :worker} = producer
+      assert %{id: Verk.QueueStats, type: :worker} = stats
+      assert %{id: Verk.ScheduleManager} = schedule_manager
 
-      assert {Verk.Manager.Supervisor, _, _, _, :supervisor, [Verk.Manager.Supervisor]} =
-               manager_sup
+      assert %{id: Verk.Manager.Supervisor, type: :supervisor} = manager_sup
 
       assert {Verk.QueuesDrainer, _, _, _, :worker, [Verk.QueuesDrainer]} = drainer
     end
@@ -60,14 +58,13 @@ defmodule Verk.SupervisorTest do
       {:ok, {_, children}} = init([])
       [redix, node_manager, producer, stats, schedule_manager, manager_sup, drainer] = children
 
-      assert {Verk.Redis, _, _, _, :worker, [Redix]} = redix
-      assert {Verk.Node.Manager, _, _, _, :worker, [Verk.Node.Manager]} = node_manager
-      assert {Verk.EventProducer, _, _, _, :worker, [Verk.EventProducer]} = producer
-      assert {Verk.QueueStats, _, _, _, :worker, [Verk.QueueStats]} = stats
-      assert {Verk.ScheduleManager, _, _, _, :worker, [Verk.ScheduleManager]} = schedule_manager
+      assert redix == Verk.Redis.child_spec([])
+      assert %{id: Verk.Node.Manager} = node_manager
+      assert %{id: Verk.EventProducer, type: :worker} = producer
+      assert %{id: Verk.QueueStats, type: :worker} = stats
+      assert %{id: Verk.ScheduleManager} = schedule_manager
 
-      assert {Verk.Manager.Supervisor, _, _, _, :supervisor, [Verk.Manager.Supervisor]} =
-               manager_sup
+      assert %{id: Verk.Manager.Supervisor, type: :supervisor} = manager_sup
 
       assert {Verk.QueuesDrainer, _, _, _, :worker, [Verk.QueuesDrainer]} = drainer
     end

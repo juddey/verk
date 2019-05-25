@@ -3,6 +3,7 @@ defmodule RedisScriptsTest do
 
   @enqueue_retriable_job_script File.read!("#{:code.priv_dir(:verk)}/enqueue_retriable_job.lua")
   @requeue_job_now_script File.read!("#{:code.priv_dir(:verk)}/requeue_job_now.lua")
+  @reenqueue_pending_job_script File.read!("#{:code.priv_dir(:verk)}/reenqueue_pending_job.lua")
 
   setup do
     {:ok, redis} = Confex.get_env(:verk, :redis_url) |> Redix.start_link()
@@ -64,6 +65,23 @@ defmodule RedisScriptsTest do
 
       assert [[_, ["job", ^enqueued_scheduled_job]]] =
                Redix.command!(redis, ~w(XRANGE verk:queue:test_queue - +))
+    end
+  end
+
+  describe "reenqueue_pending_job_script" do
+    test "claim and reenqueue pending job", %{redis: redis} do
+      job = "{\"jid\":\"123\"}"
+      stream = "verk:queue:test_queue"
+      Redix.command!(redis, ["FLUSHDB"])
+      Redix.command!(redis, ~w(XADD #{stream} * job #{job}))
+      Redix.command(redis, ["XGROUP", "CREATE", stream, "verk", 0, "MKSTREAM"])
+      Redix.command!(redis, ~w(XREADGROUP GROUP verk node_123 COUNT 1 STREAMS #{stream} >))
+      [[id, _, idle_time, _]] = Redix.command!(redis, ~w(XPENDING #{stream} verk - + 1))
+
+      {:ok, _result} = Redix.command(redis, ["EVAL", @reenqueue_pending_job_script, 1, stream, "verk", id, idle_time]) |> IO.inspect
+
+      assert [[^stream, [[new_id, ["job", ^job]]]]] = Redix.command!(redis, ~w(XREAD COUNT 100 STREAMS #{stream} 0-0))
+      assert new_id != id
     end
   end
 

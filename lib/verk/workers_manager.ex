@@ -114,9 +114,11 @@ defmodule Verk.WorkersManager do
 
     Logger.info("Workers Manager started for queue #{queue_name} (#{status})")
 
-    if status == :running, do: notify!(%Events.QueueRunning{queue: queue_name})
+    if status == :running do
+      notify!(%Events.QueueRunning{queue: queue_name})
 
-    QueueConsumer.ask(consumer, size)
+      QueueConsumer.ask(consumer, size)
+    end
 
     {:ok, state}
   end

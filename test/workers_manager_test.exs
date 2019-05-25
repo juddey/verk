@@ -147,7 +147,7 @@ defmodule Verk.WorkersManagerTest do
 
       expect(Verk.Manager, :status, fn ^queue_name -> :paused end)
       expect(QueueConsumer, :start_link, fn ^queue_name, ^workers_manager -> {:ok, consumer} end)
-      expect(QueueConsumer, :ask, fn ^consumer, ^pool_size -> :ok end)
+      reject(&QueueConsumer.ask/2)
 
       assert init([name, queue_name, queue_manager_name, pool_name, pool_size]) == {:ok, state}
     end
@@ -156,8 +156,9 @@ defmodule Verk.WorkersManagerTest do
   describe "handle_call/3 pause" do
     test "with running status" do
       queue_name = "queue_name"
-      state = %State{status: :running, queue_name: queue_name}
+      state = %State{status: :running, queue_name: queue_name, consumer: :consumer}
 
+      expect(QueueConsumer, :reset, fn :consumer, 0 -> :ok end)
       assert handle_call(:pause, :from, state) == {:reply, :ok, %{state | status: :pausing}}
       assert_receive %Verk.Events.QueuePausing{queue: ^queue_name}
     end
@@ -187,15 +188,24 @@ defmodule Verk.WorkersManagerTest do
 
     test "with pausing status" do
       queue_name = "queue_name"
-      state = %State{status: :pausing, queue_name: queue_name}
+      pool_name = "pool_name"
+      consumer = :consumer
+      state = %State{status: :pausing, queue_name: queue_name, pool_name: pool_name, consumer: consumer}
 
+      expect(:poolboy, :status, fn ^pool_name -> {:_, 5, :_, :_} end)
+      expect(QueueConsumer, :reset, fn ^consumer, 5 -> :ok end)
       assert handle_call(:resume, :from, state) == {:reply, :ok, %{state | status: :running}}
       assert_receive %Verk.Events.QueueRunning{queue: ^queue_name}
     end
 
     test "with paused status" do
       queue_name = "queue_name"
-      state = %State{status: :paused, queue_name: queue_name}
+      pool_name = "pool_name"
+      consumer = :consumer
+      state = %State{status: :paused, queue_name: queue_name, pool_name: pool_name, consumer: consumer}
+
+      expect(:poolboy, :status, fn ^pool_name -> {:_, 5, :_, :_} end)
+      expect(QueueConsumer, :reset, fn ^consumer, 5 -> :ok end)
 
       assert handle_call(:resume, :from, state) == {:reply, :ok, %{state | status: :running}}
       assert_receive %Verk.Events.QueueRunning{queue: ^queue_name}

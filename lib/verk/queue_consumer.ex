@@ -54,13 +54,11 @@ defmodule Verk.QueueConsumer do
   end
 
   def handle_cast({:reset, new_demand}, state) do
-    Logger.info "#{new_demand} reset!"
     if new_demand != 0, do: send(self(), :consume)
     {:noreply, %{state | demand: new_demand}}
   end
 
   def handle_cast({:ask, new_demand}, state) do
-    Logger.info "#{new_demand} ask!"
     if state.demand == 0, do: send(self(), :consume)
     {:noreply, %{state | demand: state.demand + new_demand}}
   end
@@ -112,8 +110,6 @@ defmodule Verk.QueueConsumer do
   end
 
   defp consume(state) do
-    Logger.info("Consuming. Demand: #{state.demand}. Last id: #{state.last_id}")
-
     Queue.consume(
       state.queue,
       state.node_id,

@@ -190,7 +190,13 @@ defmodule Verk.WorkersManagerTest do
       queue_name = "queue_name"
       pool_name = "pool_name"
       consumer = :consumer
-      state = %State{status: :pausing, queue_name: queue_name, pool_name: pool_name, consumer: consumer}
+
+      state = %State{
+        status: :pausing,
+        queue_name: queue_name,
+        pool_name: pool_name,
+        consumer: consumer
+      }
 
       expect(:poolboy, :status, fn ^pool_name -> {:_, 5, :_, :_} end)
       expect(QueueConsumer, :reset, fn ^consumer, 5 -> :ok end)
@@ -202,7 +208,13 @@ defmodule Verk.WorkersManagerTest do
       queue_name = "queue_name"
       pool_name = "pool_name"
       consumer = :consumer
-      state = %State{status: :paused, queue_name: queue_name, pool_name: pool_name, consumer: consumer}
+
+      state = %State{
+        status: :paused,
+        queue_name: queue_name,
+        pool_name: pool_name,
+        consumer: consumer
+      }
 
       expect(:poolboy, :status, fn ^pool_name -> {:_, 5, :_, :_} end)
       expect(QueueConsumer, :reset, fn ^consumer, 5 -> :ok end)

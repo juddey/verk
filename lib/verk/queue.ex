@@ -5,6 +5,9 @@ defmodule Verk.Queue do
   alias Verk.Job
   import Verk.Dsl
 
+  @external_resource "#{:code.priv_dir(:verk)}/reenqueue_pending_job.lua"
+  @reenqueue_pending_job_script_sha Verk.Scripts.sha("reenqueue_pending_job")
+
   @doc false
   def queue_name(queue) do
     "verk:queue:#{queue}"
@@ -59,8 +62,42 @@ defmodule Verk.Queue do
   def pending_node_ids(queue, redis \\ Verk.Redis) do
     case Redix.command(redis, ["XPENDING", queue_name(queue), "verk"]) do
       {:ok, [_, _, _, nil]} -> {:ok, []}
-      {:ok, [_, _, _, nodes]} -> {:ok, Enum.map(nodes, &(List.first(&1)))}
+      {:ok, [_, _, _, nodes]} -> {:ok, Enum.map(nodes, &List.first(&1))}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  List pending jobs from a queue being consumed by a node_id
+  It returns a list of tuples like this: {job_id, idle_time}
+  """
+  @spec pending(binary, binary, GenServer.server()) ::
+          {:ok, [{binary, non_neg_integer}]} | {:error, atom | Redix.Error.t()}
+  def pending(queue, node_id, count, redis \\ Verk.Redis) do
+    case Redix.command(redis, ["XPENDING", queue_name(queue), "verk", "-", "+", count, node_id]) do
+      {:ok, result} ->
+        {:ok, Enum.map(result, fn [job_id, _, idle_time, _] -> {job_id, idle_time} end)}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def reenqueue_pending_job(queue, job_id, idle_time, redis \\ Verk.Redis) do
+    case Redix.command(redis, [
+           "EVALSHA",
+           @reenqueue_pending_job_script_sha,
+           1,
+           queue_name(queue),
+           "verk",
+           job_id,
+           idle_time
+         ]) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

@@ -78,9 +78,20 @@ defmodule RedisScriptsTest do
       Redix.command!(redis, ~w(XREADGROUP GROUP verk node_123 COUNT 1 STREAMS #{stream} >))
       [[id, _, idle_time, _]] = Redix.command!(redis, ~w(XPENDING #{stream} verk - + 1))
 
-      {:ok, 1} = Redix.command(redis, ["EVAL", @reenqueue_pending_job_script, 1, stream, "verk", id, idle_time])
+      {:ok, 1} =
+        Redix.command(redis, [
+          "EVAL",
+          @reenqueue_pending_job_script,
+          1,
+          stream,
+          "verk",
+          id,
+          idle_time
+        ])
 
-      assert [[^stream, [[new_id, ["job", ^job]]]]] = Redix.command!(redis, ~w(XREAD COUNT 100 STREAMS #{stream} 0-0))
+      assert [[^stream, [[new_id, ["job", ^job]]]]] =
+               Redix.command!(redis, ~w(XREAD COUNT 100 STREAMS #{stream} 0-0))
+
       assert new_id != id
     end
 
@@ -93,10 +104,30 @@ defmodule RedisScriptsTest do
       Redix.command!(redis, ~w(XREADGROUP GROUP verk node_123 COUNT 1 STREAMS #{stream} >))
       [[id, _, idle_time, _]] = Redix.command!(redis, ~w(XPENDING #{stream} verk - + 1))
 
-      {:ok, 1} = Redix.command(redis, ["EVAL", @reenqueue_pending_job_script, 1, stream, "verk", id, idle_time])
-      assert [[^stream, [[new_id, ["job", ^job]]]]] = Redix.command!(redis, ~w(XREAD COUNT 100 STREAMS #{stream} 0-0))
+      {:ok, 1} =
+        Redix.command(redis, [
+          "EVAL",
+          @reenqueue_pending_job_script,
+          1,
+          stream,
+          "verk",
+          id,
+          idle_time
+        ])
 
-      {:ok, 0} = Redix.command(redis, ["EVAL", @reenqueue_pending_job_script, 1, stream, "verk", id, idle_time])
+      assert [[^stream, [[new_id, ["job", ^job]]]]] =
+               Redix.command!(redis, ~w(XREAD COUNT 100 STREAMS #{stream} 0-0))
+
+      {:ok, 0} =
+        Redix.command(redis, [
+          "EVAL",
+          @reenqueue_pending_job_script,
+          1,
+          stream,
+          "verk",
+          id,
+          idle_time
+        ])
 
       assert new_id != id
     end

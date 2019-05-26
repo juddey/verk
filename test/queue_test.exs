@@ -7,9 +7,7 @@ defmodule Verk.QueueTest do
   @queue_key "verk:queue:default"
 
   setup do
-    {:ok, pid} =
-      Confex.get_env(:verk, :redis_url)
-      |> Redix.start_link(name: Verk.Redis)
+    {:ok, pid} = Confex.get_env(:verk, :redis_url) |> Redix.start_link(name: Verk.Redis)
 
     Redix.command!(pid, ~w(DEL #{@queue_key}))
     ensure_group_exists!(@queue, pid)
@@ -71,7 +69,7 @@ defmodule Verk.QueueTest do
     end
   end
 
-  describe "pending/1" do
+  describe "pending_node_ids/1" do
     test "empty queue" do
       assert pending_node_ids(@queue) == {:ok, []}
     end
@@ -87,6 +85,26 @@ defmodule Verk.QueueTest do
       {:ok, _jobs} = consume(@queue, "test-123", ">", 2)
 
       assert pending_node_ids(@queue) == {:ok, ["test-123"]}
+    end
+  end
+
+  describe "pending/3" do
+    test "empty queue" do
+      assert pending(@queue, "test-123", 1) == {:ok, []}
+    end
+
+    test "non-empty queue" do
+      add_jobs!(@queue, 3)
+
+      assert pending(@queue, "test-123", 1) == {:ok, []}
+    end
+
+    test "non-empty queue consuming jobs" do
+      [job1, job2, _job3] = add_jobs!(@queue, 3)
+      {:ok, _} = consume(@queue, "test-123", ">", 2)
+
+      assert {:ok, pending_jobs} = pending(@queue, "test-123", 2)
+      assert [{^job1, _}, {^job2, _}] = pending_jobs
     end
   end
 

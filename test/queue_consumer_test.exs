@@ -61,6 +61,7 @@ defmodule Verk.QueueConsumerTest do
   describe "handle_info/2 consume last_id '>'" do
     test "nil response" do
       demand = 25
+
       state = %State{
         queue: @queue,
         node_id: @node_id,

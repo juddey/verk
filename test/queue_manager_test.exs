@@ -2,7 +2,7 @@ defmodule Verk.QueueManagerTest do
   use ExUnit.Case, async: true
   import Verk.QueueManager
   import Mimic
-  alias Verk.{Job, Queue, RetrySet, DeadSet, Redis}
+  alias Verk.{Job, Queue, RetrySet, DeadSet, Redis, Node}
 
   setup :verify_on_exit!
 
@@ -29,6 +29,7 @@ defmodule Verk.QueueManagerTest do
 
   describe "init/1" do
     test "sets up state" do
+      expect(Verk.Scripts, :load, fn _ -> :ok end)
       assert init(["queue_name"]) == {:ok, "queue_name"}
     end
   end
@@ -229,6 +230,32 @@ defmodule Verk.QueueManagerTest do
       state = "test_queue"
 
       assert handle_cast({:malformed, job_item_id}, state) == {:noreply, state}
+    end
+  end
+
+  describe "handle_info/2 reenqueue_dead_jobs" do
+    test "reenqueue jobs if dead nodes and jobs exist" do
+      queue = "queue_name"
+      jobs = [{"job_id", 123}]
+
+      expect(Queue, :pending_node_ids, fn ^queue, _redis -> {:ok, ["dead_node", "alive_node"]} end)
+
+      expect(Node, :dead?, fn "dead_node", _redis -> {:ok, true} end)
+      expect(Node, :dead?, fn "alive_node", _redis -> {:ok, false} end)
+      expect(Queue, :pending, fn ^queue, "dead_node", 25, _redis -> {:ok, jobs} end)
+      expect(Queue, :reenqueue_pending_job, fn ^queue, "job_id", 123, _redis -> :ok end)
+
+      assert handle_info(:reenqueue_dead_jobs, queue) == {:noreply, queue}
+    end
+
+    test "reenqueue jobs if dead nodes do not exist" do
+      queue = "queue_name"
+      expect(Queue, :pending_node_ids, fn ^queue, _redis -> {:ok, ["alive_node"]} end)
+      expect(Node, :dead?, fn "alive_node", _redis -> {:ok, false} end)
+      reject(&Queue.pending/4)
+      reject(&Queue.reenqueue_pending_job/4)
+
+      assert handle_info(:reenqueue_dead_jobs, queue) == {:noreply, queue}
     end
   end
 end

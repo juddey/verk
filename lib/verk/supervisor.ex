@@ -27,7 +27,6 @@ defmodule Verk.Supervisor do
 
   defp children do
     shutdown_timeout = Confex.get_env(:verk, :shutdown_timeout, 30_000)
-    generate_node_id = Confex.get_env(:verk, :generate_node_id)
 
     drainer =
       worker(
@@ -37,20 +36,15 @@ defmodule Verk.Supervisor do
         shutdown: shutdown_timeout
       )
 
-    children = [
+    [
       Verk.Redis,
+      Verk.Node.Manager,
       Verk.EventProducer,
       Verk.QueueStats,
       Verk.ScheduleManager,
       Verk.Manager.Supervisor,
       drainer
     ]
-
-    if generate_node_id do
-      List.insert_at(children, 1, Verk.Node.Manager)
-    else
-      children
-    end
   end
 
   defp verk_node_id do
@@ -59,12 +53,8 @@ defmodule Verk.Supervisor do
         local_verk_node_id
 
       :error ->
-        if Confex.get_env(:verk, :generate_node_id, false) do
-          <<part1::32, part2::32>> = :crypto.strong_rand_bytes(8)
-          "#{part1}#{part2}"
-        else
-          Confex.get_env(:verk, :node_id, "1")
-        end
+        <<part1::32, part2::32>> = :crypto.strong_rand_bytes(8)
+        "#{part1}#{part2}"
     end
   end
 end

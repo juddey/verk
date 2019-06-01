@@ -175,9 +175,9 @@ defmodule Verk.Queue do
   @doc """
   Lists enqueued jobs from `start` to `stop`
   """
-  @spec range(binary, binary, binary) :: {:ok, [Verk.Job.T]} | {:error, Redix.Error.t()}
-  def range(queue, start \\ "-", stop \\ "+") do
-    case Redix.command(Verk.Redis, ["XRANGE", queue_name(queue), start, stop]) do
+  @spec range(binary, binary, binary, non_neg_integer) :: {:ok, [Verk.Job.T]} | {:error, Redix.Error.t()}
+  def range(queue, start \\ "-", stop \\ "+", count \\ 25) do
+    case Redix.command(Verk.Redis, ["XRANGE", queue_name(queue), start, stop, "COUNT", count]) do
       {:ok, jobs} ->
         {:ok, for([item_id, ["job", job]] <- jobs, do: Job.decode!(job, item_id))}
 
@@ -189,8 +189,8 @@ defmodule Verk.Queue do
   @doc """
   Lists enqueued jobs from `start` to `stop`, raising if there's an error
   """
-  @spec range!(binary, binary, binary) :: [Verk.Job.T]
-  def range!(queue, start \\ "-", stop \\ "+") do
+  @spec range!(binary, binary, binary, non_neg_integer) :: [Verk.Job.T]
+  def range!(queue, start \\ "-", stop \\ "+", count \\ 25) do
     bangify(range(queue, start, stop))
   end
 

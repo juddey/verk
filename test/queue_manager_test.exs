@@ -29,7 +29,9 @@ defmodule Verk.QueueManagerTest do
 
   describe "init/1" do
     test "sets up state" do
+      command = ["XGROUP", "CREATE", "verk:queue:queue_name", "verk", 0, "MKSTREAM"]
       expect(Verk.Scripts, :load, fn _ -> :ok end)
+      expect(Redix, :command, fn _redis, ^command -> :ok end)
       assert init(["queue_name"]) == {:ok, "queue_name"}
     end
   end

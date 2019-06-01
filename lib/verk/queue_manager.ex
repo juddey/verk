@@ -49,9 +49,18 @@ defmodule Verk.QueueManager do
 
   @doc false
   def init([queue_name]) do
-    Verk.Scripts.load(Redis.random())
+    redis = Redis.random()
+    Verk.Scripts.load(redis)
+
+    ensure_group_exists!(queue_name, redis)
     send(self(), :reenqueue_dead_jobs)
     {:ok, queue_name}
+  end
+
+  defp ensure_group_exists!(queue, redis) do
+    Redix.command(redis, ["XGROUP", "CREATE", Queue.queue_name(queue), "verk", 0, "MKSTREAM"])
+  rescue
+    _ -> :ok
   end
 
   def handle_call({:retry, job, failed_at, exception, stacktrace}, _from, queue_name) do
@@ -107,7 +116,6 @@ defmodule Verk.QueueManager do
 
   @doc false
   def handle_info(:reenqueue_dead_jobs, queue) do
-    Logger.info("Looking for dead jobs for queue #{queue}")
     redis = Verk.Redis.random()
 
     with {:ok, node_ids} <- Queue.pending_node_ids(queue, redis),
@@ -115,6 +123,7 @@ defmodule Verk.QueueManager do
       Enum.map(dead_node_ids, fn dead_node_id ->
         case Queue.pending(queue, dead_node_id, @max_jobs, redis) do
           {:ok, jobs} ->
+            Logger.info("Pending jobs found from queue #{queue}. Total: #{length(jobs)}")
             reenqueue_dead_jobs(queue, jobs, redis)
 
           {:error, reason} ->

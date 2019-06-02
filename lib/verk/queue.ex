@@ -175,8 +175,10 @@ defmodule Verk.Queue do
   @doc """
   Lists enqueued jobs from `start` to `stop`
   """
-  @spec range(binary, binary, binary, non_neg_integer) :: {:ok, [Verk.Job.T]} | {:error, Redix.Error.t()}
-  def range(queue, start \\ "-", stop \\ "+", count \\ 25) do
+  # @spec range(binary, binary, binary, non_neg_integer) :: {:ok, [Verk.Job.T]} | {:error, Redix.Error.t()}
+  def range(queue, start \\ "0-0", stop \\ "+", count \\ 25) do
+    start = min_item_id_unprocessed(queue, start)
+
     case Redix.command(Verk.Redis, ["XRANGE", queue_name(queue), start, stop, "COUNT", count]) do
       {:ok, jobs} ->
         {:ok, for([item_id, ["job", job]] <- jobs, do: Job.decode!(job, item_id))}
@@ -186,12 +188,37 @@ defmodule Verk.Queue do
     end
   end
 
+  defp min_item_id_unprocessed(queue, start) do
+    {start, remainder} =
+      case Redix.command(Verk.Redis, ["XPENDING", queue_name(queue), "verk"]) do
+        {:ok, [_, _, nil, _]} ->
+          start = parse_item_id(start)
+          max({0, 0}, start)
+
+        {:ok, [_, _, min_item_id, _]} ->
+          min_item_id = parse_item_id(min_item_id)
+          start = parse_item_id(start)
+          result = max(min_item_id, start)
+          {result_item_id, remainder} = result
+          {result_item_id, remainder + 1}
+      end
+
+    "#{start}-#{remainder}"
+  end
+
+  defp parse_item_id(item_id) do
+    [item_id_int, remainder] = String.split(item_id, "-")
+    {item_id_int, _} = Integer.parse(item_id_int)
+    {remainder, _} = Integer.parse(remainder)
+    {item_id_int, remainder}
+  end
+
   @doc """
   Lists enqueued jobs from `start` to `stop`, raising if there's an error
   """
-  @spec range!(binary, binary, binary, non_neg_integer) :: [Verk.Job.T]
-  def range!(queue, start \\ "-", stop \\ "+", count \\ 25) do
-    bangify(range(queue, start, stop))
+  # @spec range!(binary, binary, binary, non_neg_integer) :: [Verk.Job.T]
+  def range!(queue, start \\ "0-0", stop \\ "+", count \\ 25) do
+    bangify(range(queue, start, stop, count))
   end
 
   @doc """

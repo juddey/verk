@@ -196,13 +196,42 @@ defmodule Verk.QueueTest do
     end
   end
 
-  describe "range/1" do
-    test "with items" do
+  describe "range/3" do
+    test "with no pending items passing '0-0'" do
       job = %Job{class: "Class", args: []}
       json = Job.encode!(job)
       item_id = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
 
-      assert range(@queue) == {:ok, [%{job | original_json: json, item_id: item_id}]}
+      assert range(@queue, "0-0") == {:ok, [%{job | original_json: json, item_id: item_id}]}
+    end
+
+    test "with no pending items passing an item id" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      _item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+
+      assert range(@queue, item_id_2) == {:ok, [%{job | original_json: json, item_id: item_id_2}]}
+    end
+
+    test "with pending items passing 0-0" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      _item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      {:ok, _jobs} = consume(@queue, "test-123", ">", 1)
+
+      assert range(@queue, "0-0") == {:ok, [%{job | original_json: json, item_id: item_id_2}]}
+    end
+
+    test "with pending items passing an item id" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      {:ok, _jobs} = consume(@queue, "test-123", ">", 1)
+
+      assert range(@queue, item_id_1) == {:ok, [%{job | original_json: json, item_id: item_id_2}]}
     end
 
     test "with no items" do
@@ -210,13 +239,42 @@ defmodule Verk.QueueTest do
     end
   end
 
-  describe "range!/1" do
-    test "with items" do
+  describe "range!/3" do
+    test "with no pending items passing '0-0'" do
       job = %Job{class: "Class", args: []}
       json = Job.encode!(job)
       item_id = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
 
-      assert range!(@queue) == [%{job | original_json: json, item_id: item_id}]
+      assert range!(@queue, "0-0") == [%{job | original_json: json, item_id: item_id}]
+    end
+
+    test "with no pending items passing an item id" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      _item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+
+      assert range!(@queue, item_id_2) == [%{job | original_json: json, item_id: item_id_2}]
+    end
+
+    test "with pending items passing 0-0" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      _item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      {:ok, _jobs} = consume(@queue, "test-123", ">", 1)
+
+      assert range!(@queue, "0-0") == [%{job | original_json: json, item_id: item_id_2}]
+    end
+
+    test "with pending items passing an item id" do
+      job = %Job{class: "Class", args: []}
+      json = Job.encode!(job)
+      item_id_1 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      item_id_2 = Redix.command!(Verk.Redis, ~w(XADD #{@queue_key} * job #{json}))
+      {:ok, _jobs} = consume(@queue, "test-123", ">", 1)
+
+      assert range!(@queue, item_id_1) == [%{job | original_json: json, item_id: item_id_2}]
     end
 
     test "with no items" do
